@@ -34,17 +34,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const login = async (credentials: LoginCredentials) => {
     const response = await authApi.login(credentials);
-    setToken(response.token);
+    setToken(response.access_token);
     setUser(response.user);
-    localStorage.setItem('auth_token', response.token);
+    localStorage.setItem('auth_token', response.access_token);
     localStorage.setItem('auth_user', JSON.stringify(response.user));
   };
 
   const register = async (credentials: RegisterCredentials) => {
     const response = await authApi.register(credentials);
-    setToken(response.token);
+    setToken(response.access_token);
     setUser(response.user);
-    localStorage.setItem('auth_token', response.token);
+    localStorage.setItem('auth_token', response.access_token);
     localStorage.setItem('auth_user', JSON.stringify(response.user));
   };
 

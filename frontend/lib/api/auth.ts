@@ -3,14 +3,14 @@ import type { AuthResponse, LoginCredentials, RegisterCredentials, User } from '
 
 export const authApi = {
   register: (data: RegisterCredentials) =>
-    apiClient.post<AuthResponse>('/register', data),
+    apiClient.post<AuthResponse>('/auth/register', data),
 
   login: (data: LoginCredentials) =>
-    apiClient.post<AuthResponse>('/login', data),
+    apiClient.post<AuthResponse>('/auth/login', data),
 
   logout: (token: string) =>
-    apiClient.post<{ message: string }>('/logout', undefined, token),
+    apiClient.post<{ message: string }>('/auth/logout', undefined, token),
 
   me: (token: string) =>
-    apiClient.get<{ user: User }>('/me', token),
+    apiClient.get<User>('/auth/me', token),
 };
