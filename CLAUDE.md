@@ -6,25 +6,27 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 This is a full-stack application with **separate backend and frontend** in a monorepo structure:
 
-- **Backend**: Laravel 12 API (PHP 8.4) in `backend/` directory
+- **Backend**: Laravel 13 API (PHP 8.4) in `backend/` directory
 - **Frontend**: Next.js 16 (React 19.2, TypeScript) in `frontend/` directory
 
 ### Authentication Flow
-Laravel Sanctum provides token-based authentication. The flow is:
-1. Frontend sends credentials to `/api/login` or `/api/register`
-2. Backend returns Sanctum token + user object
+JWT (`php-open-source-saver/jwt-auth`) provides token-based authentication. The flow is:
+1. Frontend sends credentials to `/api/auth/login` or `/api/auth/register`
+2. Backend returns JWT `access_token` + user object + `expires_in`
 3. Frontend stores token in localStorage
 4. Frontend sends token via `Authorization: Bearer {token}` header for protected routes
+5. Token refresh available via `POST /api/auth/refresh`
 
 **Key Implementation**:
 - `AuthProvider` (frontend/lib/auth-context.tsx) manages global auth state
 - `useAuth` hook provides auth methods to components
-- API client (frontend/lib/api/client.ts) auto-injects tokens
+- `ApiClient` (frontend/lib/api/client.ts) auto-injects Bearer token
+- Backend routes protected with `auth:api` middleware
+- `AuthController` uses `auth('api')` guard for all operations
 
 ### CORS & Cross-Origin Setup
 Backend is configured to accept requests from frontend via:
-- `backend/.env`: `SANCTUM_STATEFUL_DOMAINS` specifies allowed origins
-- `backend/bootstrap/app.php`: Sanctum middleware prepended to API routes
+- `backend/.env`: `FRONTEND_URL` specifies allowed origin
 - Current ports: Backend 8068, Frontend 3111 (both bound to 0.0.0.0 for remote access)
 
 ### API Architecture
@@ -103,8 +105,13 @@ npx shadcn@latest add [component-name]
 ```
 APP_URL=http://0.0.0.0:8068
 FRONTEND_URL=http://0.0.0.0:3111
-SANCTUM_STATEFUL_DOMAINS=localhost:3111,localhost,0.0.0.0:3111,0.0.0.0
-DB_CONNECTION=sqlite
+JWT_SECRET=<generated via php artisan jwt:secret>
+JWT_ALGO=HS256
+DB_CONNECTION=pgsql
+DB_HOST=127.0.0.1
+DB_PORT=5432
+DB_DATABASE=clawdb
+DB_USERNAME=postgres
 ```
 
 ### Frontend Environment (frontend/.env.local)
@@ -160,7 +167,7 @@ php artisan tinker
 ### API Testing with cURL
 ```bash
 # Login
-curl -X POST http://0.0.0.0:8068/api/login \
+curl -X POST http://0.0.0.0:8068/api/auth/login \
   -H "Content-Type: application/json" \
   -d '{"email":"demo@example.com","password":"password"}'
 
@@ -171,15 +178,14 @@ curl -X POST http://0.0.0.0:8068/api/posts \
   -d '{"title":"Test","content":"Content","published":true}'
 ```
 
-## Important Laravel 12 Patterns
+## Important Laravel 13 Patterns
 
 ### Middleware Registration
 Use `bootstrap/app.php` instead of `app/Http/Kernel.php` (removed in Laravel 11+):
 ```php
 ->withMiddleware(function (Middleware $middleware): void {
-    $middleware->api(prepend: [
-        \Laravel\Sanctum\Http\Middleware\EnsureFrontendRequestsAreStateful::class,
-    ]);
+    // JWT auth:api guard is configured in config/auth.php
+    // No additional middleware prepend needed for JWT
 })
 ```
 
@@ -196,15 +202,15 @@ PostController implements owner-only operations by checking `$post->user_id !== 
 
 ## Technology Versions
 
-- Laravel 12.10.1, PHP 8.4.1, Sanctum 4.2.1, Pest 4.1.6
-- Next.js 16.0.5, React 19.2.0, TypeScript 5.x, Tailwind CSS 4.x
-- Database: SQLite (development), migrate to MySQL/PostgreSQL for production
+- Laravel 13.8.0, PHP 8.4.1, JWT-Auth 2.9, Pest 4.1.6
+- Next.js 16.2.6, React 19.2.6, TypeScript 5.x, Tailwind CSS 4.x
+- Database: PostgreSQL (development & production)
 
 ## Troubleshooting
 
 ### CORS Issues
 - Verify both servers are running on correct ports
-- Check `SANCTUM_STATEFUL_DOMAINS` in backend/.env includes frontend URL
+- Check `FRONTEND_URL` in backend/.env includes frontend URL
 - Clear browser cache and localStorage
 
 ### Authentication Issues
