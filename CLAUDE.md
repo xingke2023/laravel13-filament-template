@@ -4,10 +4,20 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Architecture
 
-This is a full-stack application with **separate backend and frontend** in a monorepo structure:
+This is a full-stack application with **separate backend and frontend** in a monorepo structure, plus a built-in admin panel:
 
-- **Backend**: Laravel 13 API (PHP 8.4) in `backend/` directory
+- **Backend API**: Laravel 13 API (PHP 8.4) in `backend/` directory, served at `/api/*`
 - **Frontend**: Next.js 16 (React 19.2, TypeScript) in `frontend/` directory
+- **Admin Panel**: Filament 5.6 mounted at `/admin` on the Laravel app (same host as the API)
+
+### Three-tier surface
+| Surface | URL | Audience | Auth |
+|---|---|---|---|
+| Next.js frontend | `http://0.0.0.0:3111` | End users | JWT Bearer (stored in localStorage) |
+| Laravel API | `http://0.0.0.0:8068/api/*` | API consumers | JWT via `auth:api` guard |
+| Filament admin | `http://0.0.0.0:8068/admin` | Administrators | Laravel session (separate from JWT) |
+
+API and admin share the same `users` table but use **different auth mechanisms** — a user logging into the frontend does NOT log them into `/admin`, and vice versa.
 
 ### Authentication Flow
 JWT (`php-open-source-saver/jwt-auth`) provides token-based authentication. The flow is:
@@ -34,6 +44,15 @@ Backend is configured to accept requests from frontend via:
 - All routes prefixed with `/api`
 - Controllers in `backend/app/Http/Controllers/Api/`
 - PostController uses route model binding and authorization checks (owner-only operations)
+
+### Filament Admin Panel
+- Provider: `backend/app/Providers/Filament/AdminPanelProvider.php` — registers panel id `admin` at path `/admin`
+- Resources auto-discovered from `backend/app/Filament/Resources/`:
+  - `PostResource` — CRUD for posts
+  - `UserResource` — CRUD for users
+- Login uses the default Filament session-based form (`->login()`)
+- **Access control**: by default any authenticated `User` can sign in. For production, implement `User::canAccessPanel(Panel $panel)` returning a role/admin check
+- Pages directory `backend/app/Filament/Pages/` is auto-discovered but currently empty
 
 ## Development Commands
 
@@ -62,6 +81,11 @@ php artisan route:cache          # Cache routes for production
 php artisan route:list           # List all routes
 php artisan make:controller Api/ExampleController  # New controller
 php artisan make:model Example -mf  # Model + migration + factory
+
+# Filament admin
+php artisan make:filament-resource Example       # Scaffold a Filament resource
+php artisan make:filament-user                   # Create an admin user interactively
+php artisan filament:upgrade                     # Run after composer updates
 ```
 
 ### Frontend (Next.js)
@@ -91,6 +115,8 @@ npx shadcn@latest add [component-name]
 - **Migrations**: `database/migrations/` - Database schema
 - **Factories**: `database/factories/` - Test data generation
 - **Config**: `bootstrap/app.php` - Middleware, routing, exceptions
+- **Filament resources**: `app/Filament/Resources/` - Admin CRUD pages
+- **Filament panel config**: `app/Providers/Filament/AdminPanelProvider.php`
 
 ### Frontend
 - **Pages**: `app/*/page.tsx` - Next.js App Router pages
@@ -202,7 +228,7 @@ PostController implements owner-only operations by checking `$post->user_id !== 
 
 ## Technology Versions
 
-- Laravel 13.8.0, PHP 8.4.1, JWT-Auth 2.9, Pest 4.1.6
+- Laravel 13.8.0, PHP 8.4.1, JWT-Auth 2.9, Filament 5.6, Pest 4.4.5
 - Next.js 16.2.6, React 19.2.6, TypeScript 5.x, Tailwind CSS 4.x
 - Database: PostgreSQL (development & production)
 
